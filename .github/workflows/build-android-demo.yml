@@ -1,0 +1,91 @@
+name: Build Android Demo
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - "tools/**"
+      - ".github/workflows/build-android-demo.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tensorflow==2.13.1 transformers==4.57.3 sentencepiece h5py numpy
+
+      - name: Download NER model
+        run: |
+          curl -L -o ner_model.zip https://ftp.hankcs.com/hanlp/ner/ner_albert_base_zh_msra_20200111_202919.zip
+          unzip -q ner_model.zip
+
+      - name: Download tokenizer and base model
+        run: |
+          python - <<'PY'
+          from transformers import AutoTokenizer, TFAutoModel
+
+          model_name = "uer/albert-base-chinese-cluecorpussmall"
+          AutoTokenizer.from_pretrained(model_name, use_fast=False).save_pretrained("hf_albert_base_zh")
+          TFAutoModel.from_pretrained(model_name).save_pretrained("hf_albert_base_zh")
+          PY
+
+      - name: Export TFLite
+        run: |
+          python tools/export_ner_tflite_legacy_albert.py \
+            --model-dir ner_albert_base_zh_msra_20200111_202919 \
+            --base-model hf_albert_base_zh \
+            --export-dir export/ner_albert_msra \
+            --tflite-path export/ner_albert_msra/ner_float16.tflite \
+            --quant float16 \
+            --max-seq-length 128
+
+      - name: Copy assets into Android app
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp export/ner_albert_msra/ner_float16.tflite android/app/src/main/assets/ner_float16.tflite
+          cp export/ner_albert_msra/labels.txt android/app/src/main/assets/labels.txt
+          cp hf_albert_base_zh/vocab.txt android/app/src/main/assets/vocab.txt
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Build APK
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: "8.1.1"
+          arguments: ":app:assembleDebug"
+          build-root-directory: android
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hanlp-ner-demo
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            export/ner_albert_msra/ner_float16.tflite
+            export/ner_albert_msra/labels.txt
+            hf_albert_base_zh/vocab.txt

@@ -291,3 +291,19 @@ data
 _static/
 _build/
 _templates/
+
+# Android/Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
+# Model artifacts and exports
+export/
+hf_albert_base_zh/
+ner_albert_base_zh_msra_20200111_202919/
+android/app/src/main/assets/ner_float16.tflite
+android/app/src/main/assets/labels.txt
+android/app/src/main/assets/vocab.txt
