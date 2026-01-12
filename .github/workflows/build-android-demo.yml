@@ -20,6 +20,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      USE_TORCH: "0"
+      USE_TF: "1"
 
     steps:
       - name: Checkout
