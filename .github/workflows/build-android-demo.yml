@@ -52,8 +52,8 @@ jobs:
           from transformers import AutoTokenizer, TFAutoModel
 
           model_name = "uer/albert-base-chinese-cluecorpussmall"
-          AutoTokenizer.from_pretrained(model_name, use_fast=False).save_pretrained("hf_albert_base_zh")
-          TFAutoModel.from_pretrained(model_name).save_pretrained("hf_albert_base_zh")
+          AutoTokenizer.from_pretrained(model_name, use_fast=False).save_pretrained("albert_base_zh")
+          TFAutoModel.from_pretrained(model_name).save_pretrained("albert_base_zh")
           PY
 
       - name: Resolve quantization settings
@@ -99,7 +99,7 @@ jobs:
           cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" \
             android/app/src/main/assets/ner_float16.tflite
           cp export/ner_albert_msra/labels.txt android/app/src/main/assets/labels.txt
-          cp hf_albert_base_zh/vocab.txt android/app/src/main/assets/vocab.txt
+          cp albert_base_zh/vocab.txt android/app/src/main/assets/vocab.txt
 
       - name: Package resources
         run: |
@@ -108,7 +108,7 @@ jobs:
           cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" "$bundle_dir/"
           cp export/ner_albert_msra/labels.txt "$bundle_dir/"
           cp export/ner_albert_msra/meta.json "$bundle_dir/"
-          cp hf_albert_base_zh/vocab.txt "$bundle_dir/"
+          cp albert_base_zh/vocab.txt "$bundle_dir/"
           (cd "$bundle_dir" && zip -r "../hanlp_ner_assets_${{ steps.quant.outputs.tag }}.zip" .)
 
       - name: Set up Java
@@ -142,4 +142,4 @@ jobs:
             export/ner_albert_msra/labels.txt
             export/ner_albert_msra/meta.json
             export/ner_albert_msra/hanlp_ner_assets_${{ steps.quant.outputs.tag }}.zip
-            hf_albert_base_zh/vocab.txt
+            albert_base_zh/vocab.txt
