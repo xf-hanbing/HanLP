@@ -18,6 +18,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +36,14 @@ public class NerEngine implements Closeable {
     private final Vocab vocab;
     private final List<String> labels;
     private final int maxLen;
+    private final String modelFile;
 
-    private NerEngine(Interpreter interpreter, Vocab vocab, List<String> labels, int maxLen) {
+    private NerEngine(Interpreter interpreter, Vocab vocab, List<String> labels, int maxLen, String modelFile) {
         this.interpreter = interpreter;
         this.vocab = vocab;
         this.labels = labels;
         this.maxLen = maxLen;
+        this.modelFile = modelFile;
     }
 
     public static NerEngine fromAssets(AssetManager assets) throws IOException {
@@ -58,7 +61,7 @@ public class NerEngine implements Closeable {
         int seqLen = interpreter.getInputTensor(0).shape()[1];
         Vocab vocab = Vocab.fromAsset(assets, VOCAB_FILE);
         List<String> labels = readLines(assets, LABELS_FILE);
-        return new NerEngine(interpreter, vocab, labels, seqLen);
+        return new NerEngine(interpreter, vocab, labels, seqLen, resolved);
     }
 
     public List<Span> predict(String text) {
@@ -72,6 +75,32 @@ public class NerEngine implements Closeable {
     @Override
     public void close() {
         interpreter.close();
+    }
+
+    public String debugSummary() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Model: ").append(modelFile).append("\n");
+        int inputCount = interpreter.getInputTensorCount();
+        for (int i = 0; i < inputCount; i++) {
+            Tensor t = interpreter.getInputTensor(i);
+            QuantizationParams q = t.quantizationParams();
+            sb.append("Input ").append(i)
+                    .append(": ").append(t.name())
+                    .append(" ").append(t.dataType())
+                    .append(" shape=").append(Arrays.toString(t.shape()))
+                    .append(" scale=").append(q.getScale())
+                    .append(" zero=").append(q.getZeroPoint())
+                    .append("\n");
+        }
+        Tensor out = interpreter.getOutputTensor(0);
+        QuantizationParams q = out.quantizationParams();
+        sb.append("Output: ")
+                .append(out.name())
+                .append(" ").append(out.dataType())
+                .append(" shape=").append(Arrays.toString(out.shape()))
+                .append(" scale=").append(q.getScale())
+                .append(" zero=").append(q.getZeroPoint());
+        return sb.toString();
     }
 
     private Output run(Encoding encoding) {

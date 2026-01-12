@@ -14,6 +14,7 @@ on:
         options:
           - float16
           - int8
+          - hybrid-int8
           - full-int8
           - all
 
@@ -62,13 +63,14 @@ jobs:
           if [ "$quantize" != "true" ]; then
             mode="none"
           else
-            if [ "$mode" != "float16" ] && [ "$mode" != "int8" ] && [ "$mode" != "full-int8" ] && [ "$mode" != "all" ]; then
+            if [ "$mode" != "float16" ] && [ "$mode" != "int8" ] && [ "$mode" != "hybrid-int8" ] && [ "$mode" != "full-int8" ] && [ "$mode" != "all" ]; then
               mode="float16"
             fi
           fi
           case "$mode" in
             none) tag="float32" ;;
             full-int8) tag="full_int8" ;;
+            hybrid-int8) tag="hybrid_int8" ;;
             all) tag="all" ;;
             *) tag="$mode" ;;
           esac
@@ -99,7 +101,10 @@ jobs:
           if [ "$mode" = "all" ]; then
             run_export "float16" "float16" "false"
             run_export "int8" "int8" "false"
+            run_export "hybrid_int8" "hybrid-int8" "false"
             run_export "full_int8" "int8" "true"
+          elif [ "$mode" = "hybrid-int8" ]; then
+            run_export "hybrid_int8" "hybrid-int8" "false"
           elif [ "$mode" = "full-int8" ]; then
             run_export "full_int8" "int8" "true"
           elif [ "$mode" = "int8" ]; then
@@ -117,6 +122,7 @@ jobs:
           if [ "$mode" = "all" ]; then
             cp export/ner_albert_msra/ner_float16.tflite android/app/src/main/assets/ner_float16.tflite
             cp export/ner_albert_msra/ner_int8.tflite android/app/src/main/assets/ner_int8.tflite
+            cp export/ner_albert_msra/ner_hybrid_int8.tflite android/app/src/main/assets/ner_hybrid_int8.tflite
             cp export/ner_albert_msra/ner_full_int8.tflite android/app/src/main/assets/ner_full_int8.tflite
           else
             cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" \
@@ -133,6 +139,7 @@ jobs:
           if [ "$mode" = "all" ]; then
             cp export/ner_albert_msra/ner_float16.tflite "$bundle_dir/"
             cp export/ner_albert_msra/ner_int8.tflite "$bundle_dir/"
+            cp export/ner_albert_msra/ner_hybrid_int8.tflite "$bundle_dir/"
             cp export/ner_albert_msra/ner_full_int8.tflite "$bundle_dir/"
           else
             cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" "$bundle_dir/"

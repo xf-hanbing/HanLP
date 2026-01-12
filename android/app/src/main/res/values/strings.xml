@@ -7,6 +7,7 @@
         <item>Float32</item>
         <item>Float16</item>
         <item>Int8</item>
+        <item>Hybrid Int8</item>
         <item>Full Int8</item>
     </string-array>
     <string name="run_button">识别实体</string>

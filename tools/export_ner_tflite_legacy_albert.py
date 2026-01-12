@@ -168,6 +168,11 @@ def convert_tflite(saved_model_dir: Path, tflite_path: Path, quant: str, full_in
             converter.representative_dataset = rep_texts
             converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
             # Keep int32 token id inputs; forcing int8 inputs can saturate ids and hurt accuracy.
+    elif quant == "hybrid-int8":
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        if rep_texts is None:
+            raise ValueError("--quant hybrid-int8 requires --rep-data or --rep-text")
+        converter.representative_dataset = rep_texts
     elif quant != "none":
         raise ValueError(f"Unsupported quant mode: {quant}")
 
@@ -183,7 +188,12 @@ def parse_args():
     parser.add_argument("--base-model", required=True, help="HF ALBERT directory for config/tokenizer")
     parser.add_argument("--export-dir", required=True, help="Output directory for SavedModel and labels")
     parser.add_argument("--tflite-path", required=True, help="Output .tflite path")
-    parser.add_argument("--quant", default="float16", choices=["none", "float16", "int8"], help="Quantization mode")
+    parser.add_argument(
+        "--quant",
+        default="float16",
+        choices=["none", "float16", "int8", "hybrid-int8"],
+        help="Quantization mode",
+    )
     parser.add_argument("--full-int8", action="store_true", help="Use full int8 (requires representative data).")
     parser.add_argument("--rep-data", default=None, help="Path to representative text file, one sentence per line.")
     parser.add_argument("--rep-text", default=None, help="Inline representative text, can be used multiple times.",

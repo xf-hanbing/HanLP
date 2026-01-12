@@ -25,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
             "ner_float32.tflite",
             "ner_float16.tflite",
             "ner_int8.tflite",
+            "ner_hybrid_int8.tflite",
             "ner_full_int8.tflite"
     };
 
@@ -78,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
                             .append("\n");
                 }
             }
+            sb.append("\n---\n").append(engine.debugSummary());
             runOnUiThread(() -> resultText.setText(sb.toString()));
         } catch (Exception e) {
             runOnUiThread(() -> resultText.setText("运行失败: " + e.getMessage()));
