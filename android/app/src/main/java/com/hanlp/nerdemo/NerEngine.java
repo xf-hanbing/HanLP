@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 public class NerEngine implements Closeable {
-    private static final String MODEL_FILE = "ner_float16.tflite";
+    private static final String DEFAULT_MODEL_FILE = "ner_float16.tflite";
     private static final String VOCAB_FILE = "vocab.txt";
     private static final String LABELS_FILE = "labels.txt";
     private static final String CLS = "[CLS]";
@@ -44,7 +44,14 @@ public class NerEngine implements Closeable {
     }
 
     public static NerEngine fromAssets(AssetManager assets) throws IOException {
-        MappedByteBuffer modelBuffer = loadModelFile(assets, MODEL_FILE);
+        return fromAssets(assets, DEFAULT_MODEL_FILE);
+    }
+
+    public static NerEngine fromAssets(AssetManager assets, String modelFile) throws IOException {
+        String resolved = (modelFile == null || modelFile.trim().isEmpty())
+                ? DEFAULT_MODEL_FILE
+                : modelFile.trim();
+        MappedByteBuffer modelBuffer = loadModelFile(assets, resolved);
         Interpreter.Options options = new Interpreter.Options();
         options.setNumThreads(4);
         Interpreter interpreter = new Interpreter(modelBuffer, options);

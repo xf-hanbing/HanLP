@@ -2,6 +2,13 @@
     <string name="app_name">HanLP NER Demo</string>
     <string name="title_text">HanLP MSRA NER (TFLite)</string>
     <string name="input_hint">请输入一段中文文本</string>
+    <string name="precision_label">精度</string>
+    <string-array name="precision_options">
+        <item>Float32</item>
+        <item>Float16</item>
+        <item>Int8</item>
+        <item>Full Int8</item>
+    </string-array>
     <string name="run_button">识别实体</string>
     <string name="result_label">识别结果</string>
 </resources>

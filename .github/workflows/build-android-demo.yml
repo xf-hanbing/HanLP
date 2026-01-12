@@ -15,6 +15,7 @@ on:
           - float16
           - int8
           - full-int8
+          - all
 
 jobs:
   build:
@@ -59,44 +60,68 @@ jobs:
           quantize="${{ github.event.inputs.quantize || 'true' }}"
           mode="${{ github.event.inputs.quant_mode || 'float16' }}"
           if [ "$quantize" != "true" ]; then
-            quant="none"
-            full_int8="false"
-            tag="float32"
+            mode="none"
           else
-            if [ "$mode" = "full-int8" ]; then
-              quant="int8"
-              full_int8="true"
-              tag="full_int8"
-            else
-              quant="$mode"
-              full_int8="false"
-              tag="$mode"
+            if [ "$mode" != "float16" ] && [ "$mode" != "int8" ] && [ "$mode" != "full-int8" ] && [ "$mode" != "all" ]; then
+              mode="float16"
             fi
           fi
-          echo "quant=$quant" >> "$GITHUB_OUTPUT"
-          echo "full_int8=$full_int8" >> "$GITHUB_OUTPUT"
+          case "$mode" in
+            none) tag="float32" ;;
+            full-int8) tag="full_int8" ;;
+            all) tag="all" ;;
+            *) tag="$mode" ;;
+          esac
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Export TFLite
         run: |
-          args=(
-            --model-dir ner_albert_base_zh_msra_20200111_202919
-            --base-model albert_base_zh
-            --export-dir export/ner_albert_msra
-            --tflite-path "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite"
-            --quant "${{ steps.quant.outputs.quant }}"
-            --max-seq-length 128
-          )
-          if [ "${{ steps.quant.outputs.full_int8 }}" = "true" ]; then
-            args+=(--full-int8 --rep-data tools/rep_text_zh.txt)
+          run_export() {
+            local tag="$1"
+            local quant="$2"
+            local full_int8="$3"
+            args=(
+              --model-dir ner_albert_base_zh_msra_20200111_202919
+              --base-model albert_base_zh
+              --export-dir export/ner_albert_msra
+              --tflite-path "export/ner_albert_msra/ner_${tag}.tflite"
+              --quant "$quant"
+              --max-seq-length 128
+            )
+            if [ "$full_int8" = "true" ]; then
+              args+=(--full-int8 --rep-data tools/rep_text_zh.txt)
+            fi
+            python tools/export_ner_tflite_legacy_albert.py "${args[@]}"
+          }
+
+          mode="${{ steps.quant.outputs.mode }}"
+          if [ "$mode" = "all" ]; then
+            run_export "float16" "float16" "false"
+            run_export "int8" "int8" "false"
+            run_export "full_int8" "int8" "true"
+          elif [ "$mode" = "full-int8" ]; then
+            run_export "full_int8" "int8" "true"
+          elif [ "$mode" = "int8" ]; then
+            run_export "int8" "int8" "false"
+          elif [ "$mode" = "none" ]; then
+            run_export "float32" "none" "false"
+          else
+            run_export "float16" "float16" "false"
           fi
-          python tools/export_ner_tflite_legacy_albert.py "${args[@]}"
 
       - name: Copy assets into Android app
         run: |
           mkdir -p android/app/src/main/assets
-          cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" \
-            android/app/src/main/assets/ner_float16.tflite
+          mode="${{ steps.quant.outputs.mode }}"
+          if [ "$mode" = "all" ]; then
+            cp export/ner_albert_msra/ner_float16.tflite android/app/src/main/assets/ner_float16.tflite
+            cp export/ner_albert_msra/ner_int8.tflite android/app/src/main/assets/ner_int8.tflite
+            cp export/ner_albert_msra/ner_full_int8.tflite android/app/src/main/assets/ner_full_int8.tflite
+          else
+            cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" \
+              "android/app/src/main/assets/ner_${{ steps.quant.outputs.tag }}.tflite"
+          fi
           cp export/ner_albert_msra/labels.txt android/app/src/main/assets/labels.txt
           cp albert_base_zh/vocab.txt android/app/src/main/assets/vocab.txt
 
@@ -104,7 +129,14 @@ jobs:
         run: |
           bundle_dir="export/ner_albert_msra/resources_${{ steps.quant.outputs.tag }}"
           mkdir -p "$bundle_dir"
-          cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" "$bundle_dir/"
+          mode="${{ steps.quant.outputs.mode }}"
+          if [ "$mode" = "all" ]; then
+            cp export/ner_albert_msra/ner_float16.tflite "$bundle_dir/"
+            cp export/ner_albert_msra/ner_int8.tflite "$bundle_dir/"
+            cp export/ner_albert_msra/ner_full_int8.tflite "$bundle_dir/"
+          else
+            cp "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite" "$bundle_dir/"
+          fi
           cp export/ner_albert_msra/labels.txt "$bundle_dir/"
           cp export/ner_albert_msra/meta.json "$bundle_dir/"
           cp albert_base_zh/vocab.txt "$bundle_dir/"
@@ -137,7 +169,7 @@ jobs:
           name: hanlp-ner-demo-${{ steps.quant.outputs.tag }}
           path: |
             android/app/build/outputs/apk/debug/app-debug.apk
-            export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite
+            export/ner_albert_msra/ner_*.tflite
             export/ner_albert_msra/labels.txt
             export/ner_albert_msra/meta.json
             export/ner_albert_msra/hanlp_ner_assets_${{ steps.quant.outputs.tag }}.zip
