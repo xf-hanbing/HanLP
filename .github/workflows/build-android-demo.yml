@@ -15,11 +15,6 @@ on:
           - float16
           - int8
           - full-int8
-  push:
-    paths:
-      - "android/**"
-      - "tools/**"
-      - ".github/workflows/build-android-demo.yml"
 
 jobs:
   build:
@@ -40,6 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install tensorflow==2.13.1 transformers==4.57.3 sentencepiece h5py numpy \
             hanlp-common hanlp-trie hanlp-downloader termcolor toposort packaging filelock
+          pip install -e . --no-deps
 
       - name: Download NER model
         run: |
