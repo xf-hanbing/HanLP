@@ -167,8 +167,7 @@ def convert_tflite(saved_model_dir: Path, tflite_path: Path, quant: str, full_in
                 raise ValueError("--full-int8 requires --rep-data or --rep-text")
             converter.representative_dataset = rep_texts
             converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-            converter.inference_input_type = tf.int8
-            converter.inference_output_type = tf.int8
+            # Keep int32 token id inputs; forcing int8 inputs can saturate ids and hurt accuracy.
     elif quant != "none":
         raise ValueError(f"Unsupported quant mode: {quant}")
 
