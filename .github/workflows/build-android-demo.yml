@@ -36,10 +36,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
-          pip install tensorflow==2.13.1 transformers==4.57.3 sentencepiece h5py numpy \
-            hanlp-common hanlp-trie hanlp-downloader termcolor toposort packaging filelock
-          pip install -e ".[full]"
+          pip install tensorflow==2.13.1 transformers==4.57.3 sentencepiece h5py numpy
 
       - name: Download NER model
         run: |
@@ -84,14 +81,16 @@ jobs:
         run: |
           args=(
             --model-dir ner_albert_base_zh_msra_20200111_202919
+            --base-model albert_base_zh
             --export-dir export/ner_albert_msra
             --tflite-path "export/ner_albert_msra/ner_${{ steps.quant.outputs.tag }}.tflite"
             --quant "${{ steps.quant.outputs.quant }}"
+            --max-seq-length 128
           )
           if [ "${{ steps.quant.outputs.full_int8 }}" = "true" ]; then
             args+=(--full-int8 --rep-data tools/rep_text_zh.txt)
           fi
-          python tools/export_ner_tflite.py "${args[@]}"
+          python tools/export_ner_tflite_legacy_albert.py "${args[@]}"
 
       - name: Copy assets into Android app
         run: |
