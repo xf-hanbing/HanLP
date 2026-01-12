@@ -66,10 +66,7 @@ public class NerEngine implements Closeable {
 
     public List<Span> predict(String text) {
         List<String> chars = splitToChars(text);
-        Encoding encoding = encode(chars, vocab, maxLen);
-        Output output = run(encoding);
-        List<String> tags = outputToTags(output, labels, encoding.labelMask);
-        return decodeSpans(chars, tags);
+        return predictWithChunks(chars);
     }
 
     @Override
@@ -241,6 +238,67 @@ public class NerEngine implements Closeable {
         return new Encoding(inputIds, attentionMask, tokenTypeIds, mask);
     }
 
+    private List<Span> predictWithChunks(List<String> chars) {
+        int limit = maxLen - 2;
+        List<Integer> tokenLens = new ArrayList<>(chars.size());
+        int totalTokens = 0;
+        for (String ch : chars) {
+            int len = wordpieceTokenize(ch, vocab).size();
+            tokenLens.add(len);
+            totalTokens += len;
+        }
+        if (totalTokens <= limit) {
+            return predictChunk(chars, 0);
+        }
+        List<Span> spans = new ArrayList<>();
+        int start = 0;
+        while (start < chars.size()) {
+            int tokenSum = 0;
+            int lastPunct = -1;
+            int i = start;
+            for (; i < chars.size(); i++) {
+                int len = tokenLens.get(i);
+                if (tokenSum + len > limit) {
+                    break;
+                }
+                tokenSum += len;
+                if (isSplitPunct(chars.get(i))) {
+                    lastPunct = i + 1;
+                }
+            }
+            int end;
+            if (i >= chars.size()) {
+                end = chars.size();
+            } else if (lastPunct > start) {
+                end = lastPunct;
+            } else {
+                end = i;
+            }
+            if (end <= start) {
+                end = Math.min(start + 1, chars.size());
+            }
+            List<String> chunk = chars.subList(start, end);
+            spans.addAll(predictChunk(chunk, start));
+            start = end;
+        }
+        return spans;
+    }
+
+    private List<Span> predictChunk(List<String> chars, int offset) {
+        Encoding encoding = encode(chars, vocab, maxLen);
+        Output output = run(encoding);
+        List<String> tags = outputToTags(output, labels, encoding.labelMask);
+        List<Span> chunkSpans = decodeSpans(chars, tags);
+        if (offset == 0) {
+            return chunkSpans;
+        }
+        List<Span> shifted = new ArrayList<>(chunkSpans.size());
+        for (Span span : chunkSpans) {
+            shifted.add(new Span(span.type, span.text, span.start + offset, span.end + offset));
+        }
+        return shifted;
+    }
+
     private static List<String> outputToTags(Output output, List<String> labels, int[] labelMask) {
         List<String> tags = new ArrayList<>();
         int seqLen = output.seqLen();
@@ -315,6 +373,16 @@ public class NerEngine implements Closeable {
             sb.append(chars.get(i));
         }
         return sb.toString();
+    }
+
+    private static boolean isSplitPunct(String token) {
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+        char c = token.charAt(0);
+        return c == '，' || c == '。' || c == '！' || c == '？' || c == '；' || c == '：'
+                || c == '、' || c == '…' || c == '—'
+                || c == ',' || c == '.' || c == '!' || c == '?' || c == ';' || c == ':';
     }
 
     private static List<String> wordpieceTokenize(String token, Vocab vocab) {

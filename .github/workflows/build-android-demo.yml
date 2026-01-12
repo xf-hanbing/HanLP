@@ -17,6 +17,10 @@ on:
           - hybrid-int8
           - full-int8
           - all
+      max_seq_length:
+        type: number
+        description: "Max input length for export"
+        default: 128
 
 jobs:
   build:
@@ -60,12 +64,16 @@ jobs:
         run: |
           quantize="${{ github.event.inputs.quantize || 'true' }}"
           mode="${{ github.event.inputs.quant_mode || 'float16' }}"
+          max_len="${{ github.event.inputs.max_seq_length || '128' }}"
           if [ "$quantize" != "true" ]; then
             mode="none"
           else
             if [ "$mode" != "float16" ] && [ "$mode" != "int8" ] && [ "$mode" != "hybrid-int8" ] && [ "$mode" != "full-int8" ] && [ "$mode" != "all" ]; then
               mode="float16"
             fi
+          fi
+          if ! [[ "$max_len" =~ ^[0-9]+$ ]]; then
+            max_len=128
           fi
           case "$mode" in
             none) tag="float32" ;;
@@ -76,6 +84,7 @@ jobs:
           esac
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "max_len=$max_len" >> "$GITHUB_OUTPUT"
 
       - name: Export TFLite
         run: |
@@ -89,10 +98,13 @@ jobs:
               --export-dir export/ner_albert_msra
               --tflite-path "export/ner_albert_msra/ner_${tag}.tflite"
               --quant "$quant"
-              --max-seq-length 128
+              --max-seq-length "${{ steps.quant.outputs.max_len }}"
             )
             if [ "$full_int8" = "true" ]; then
-              args+=(--full-int8 --rep-data tools/rep_text_zh.txt)
+              args+=(--full-int8)
+            fi
+            if [ "$full_int8" = "true" ] || [ "$quant" = "hybrid-int8" ]; then
+              args+=(--rep-data tools/rep_text_zh.txt)
             fi
             python tools/export_ner_tflite_legacy_albert.py "${args[@]}"
           }
